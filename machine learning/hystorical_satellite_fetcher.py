@@ -22,18 +22,18 @@ def get_sentinel_image_tensor(
     Downloads cloud-free Sentinel-2 images and returns a tensor of shape [1, C, T, H, W].
 
     Parameters:
-        bbox_coords : list     – [min_lon, min_lat, max_lon, max_lat]
-        time_start   : str     – e.g., "2024-08-01"
-        time_end     : str     – e.g., "2024-10-01"
-        n_images     : int     – number of time steps to collect
-        max_cloud    : int     – max cloud % (0–100)
-        bands        : tuple   – Sentinel-2 band names
-        max_dim      : int     – max width/height in pixels
+        bbox_coords : list     [min_lon, min_lat, max_lon, max_lat]
+        time_start   : str     e.g., "2024-08-01"
+        time_end     : str     e.g., "2024-10-01"
+        n_images     : int     number of time steps to collect
+        max_cloud    : int     max cloud % (0-100)
+        bands        : tuple   Sentinel-2 band names
+        max_dim      : int     max width/height in pixels
         config       : SHConfig or None
-        visualize    : bool    – whether to show a grid of the images
+        visualize    : bool    whether to show a grid of the images
 
     Returns:
-        torch.Tensor – [1, C, T, H, W]
+        torch.Tensor [1, C, T, H, W]
     """
     if config is None:
         from cdse_config import get_config
