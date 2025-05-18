@@ -105,14 +105,15 @@ def get_sentinel_image_tensor(
 
     # Reformat to [1, C, T, H, W]
     stack_array = np.stack(image_stack)  # [T, H, W, C]
-    stack_array = stack_array.transpose(0, 3, 1, 2)  # [T, C, H, W]
-    stack_tensor = torch.tensor(stack_array, dtype=torch.float32).unsqueeze(0)  # [1, C, T, H, W]
+    stack_tensor = torch.tensor(stack_array.transpose(0, 3, 1, 2), dtype=torch.float32)  # [T, C, H, W]
+    stack_tensor = stack_tensor.permute(1, 0, 2, 3).unsqueeze(0)  # [1, C, T, H, W]
+
 
     if visualize:
         rows = (n_images + 2) // 3
         fig, axes = plt.subplots(rows, 3, figsize=(15, 5 * rows))
         for i, (ax, img, date) in enumerate(zip(axes.flat, stack_array, selected_dates)):
-            norm_img = np.clip(img.transpose(1, 2, 0) / np.max(img), 0, 1)
+            norm_img = np.clip(img / np.max(img), 0, 1)  # img is already [H, W, C]
             ax.imshow(norm_img)
             ax.set_title(f"Date: {date}")
             ax.axis("off")
@@ -122,3 +123,12 @@ def get_sentinel_image_tensor(
         plt.show()
 
     return stack_tensor
+
+if __name__ == "__main__":
+        sat_tensor = get_sentinel_image_tensor(
+            bbox_coords=[24.54, 60.13, 25.15, 60.35],  # Helisinki
+            time_start="2024-08-01",
+            time_end="2024-10-01",
+            n_images=5,
+            visualize=True
+        )

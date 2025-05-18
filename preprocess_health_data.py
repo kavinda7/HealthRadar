@@ -38,6 +38,43 @@ def preprocess_health_data(raw_tensor: torch.Tensor, outlier_z=3.0) -> torch.Ten
 
     return torch.tensor(np.stack(processed), dtype=torch.float32)
 
+def downsample_health_to_satellite_times(
+    health_df: pd.DataFrame,
+    satellite_times: list,
+    window: str = "12h"
+) -> torch.Tensor:
+    """
+    Aligns health time-series to satellite timestamps by averaging over a time window.
+
+    Args:
+        health_df        : pd.DataFrame with datetime index and health features
+        satellite_times  : list of str or pd.Timestamp, satellite image timestamps
+        window           : str, aggregation window (e.g. '12h' means ±6h around each timestamp)
+
+    Returns:
+        torch.Tensor: shape [1, T, F] where T = len(satellite_times), F = feature count
+    """
+    downsampled = []
+
+    half_window = pd.Timedelta(window) / 2
+    health_df = health_df.sort_index()
+
+    for t in satellite_times:
+        t = pd.to_datetime(t)
+        segment = health_df.loc[t - half_window : t + half_window]
+
+        if segment.empty:
+            #raise ValueError(f"No health data found near satellite timestamp {t}")
+            print(f"Skipping {t} no data in window")
+            continue
+
+        
+        vector = segment.mean().to_numpy()
+        downsampled.append(vector)
+
+    result = torch.tensor(downsampled, dtype=torch.float32).unsqueeze(0)  # [1, T, F]
+    return result
+
 
 if __name__ == "__main__":
 
@@ -71,12 +108,46 @@ if __name__ == "__main__":
             plt.tight_layout()
             plt.show()
 
-    raw_health = torch.tensor([
-        [[36.5, 72, 120], [np.nan, 74, 122], [36.8, 200, 123], [36.6, 73, np.nan], [36.7, 71, 121]],
-        [[37.0, 80, 130], [36.9, 79, 128], [np.nan, 300, 127], [37.2, 81, 131], [37.1, 80, 129]]
-    ], dtype=torch.float32)
+    dates = pd.date_range("2024-08-05", periods=50, freq="6h")
+    health_df = pd.DataFrame({
+        "temp": [36.5, np.nan, 36.8, 36.6, 36.7, 36.9, 37.0, np.nan, 37.1, 36.8,
+                36.5, np.nan, 36.8, 36.6, 36.7, 36.9, 37.0, np.nan, 37.1, 36.8,
+                36.5, np.nan, 36.8, 36.6, 36.7, 36.9, 37.0, np.nan, 37.1, 36.8,
+                36.5, np.nan, 36.8, 36.6, 36.7, 36.9, 37.0, np.nan, 37.1, 36.8,
+                36.5, np.nan, 36.8, 36.6, 36.7, 36.9, 37.0, np.nan, 37.1, 36.8],
+        
+        "hr":   [72, 74, 200, 73, 71, 75, 76, 300, 77, 78,
+                72, 74, 200, 73, 71, 75, 76, 300, 77, 78,
+                72, 74, 200, 73, 71, 75, 76, 300, 77, 78,
+                72, 74, 200, 73, 71, 75, 76, 300, 77, 78,
+                72, 74, 200, 73, 71, 75, 76, 300, 77, 78],
 
-    cleaned_health = preprocess_health_data(raw_health)
+        "bp":   [120, 122, 123, np.nan, 121, 125, 127, 126, 129, 128,
+                120, 122, 123, np.nan, 121, 125, 127, 126, 129, 128,
+                120, 122, 123, np.nan, 121, 125, 127, 126, 129, 128,
+                120, 122, 123, np.nan, 121, 125, 127, 126, 129, 128,
+                120, 122, 123, np.nan, 121, 125, 127, 126, 129, 128]
+    }, index=dates)
 
-    visualize_health_preprocessing(raw_health, cleaned_health, feature_names=["Body Temp", "Pulse", "BP"])
 
+    cleaned_tensor = preprocess_health_data(torch.tensor(health_df.to_numpy()).unsqueeze(0))  # [1, T, F]
+    cleaned_df = pd.DataFrame(cleaned_tensor.squeeze(0).numpy(), index=dates, columns=health_df.columns)
+
+
+    visualize_health_preprocessing(
+        torch.tensor(health_df.to_numpy()).unsqueeze(0),
+        torch.tensor(cleaned_df.to_numpy()).unsqueeze(0),
+        feature_names=["Body Temp", "Pulse", "BP"]
+    )
+
+    print("Health tensor shape:", cleaned_tensor.shape)  # [1, T, F]
+    print(cleaned_tensor)
+
+    health_tensor = downsample_health_to_satellite_times(
+        cleaned_df,
+        ["2024-08-05", "2024-08-10", "2024-08-15"],
+        window="12h"
+    )
+
+    print("Downsampled health tensor shape:", health_tensor.shape)  # [1, T, F]
+    print(health_tensor)
